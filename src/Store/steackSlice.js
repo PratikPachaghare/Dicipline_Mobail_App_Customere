@@ -1,30 +1,33 @@
+// src/store/streakSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  gym: false,
-  study: false,
-  meditation: false,
-  yoga:false
+  // Start empty or with defaults? Let's start empty so user MUST pick.
+  actions: [], 
 };
 
 const streakSlice = createSlice({
   name: 'streaks',
   initialState,
   reducers: {
+    // ... existing reducers ...
     markStreakCompleted: (state, action) => {
-      // action.payload should be "gym", "study", etc.
-      const type = action.payload; 
-      if (state[type] !== undefined) {
-        state[type] = true;
-      }
+      const targetId = action.payload;
+      const item = state.actions.find((i) => i.id === targetId);
+      if (item) item.completed = true;
     },
-    resetStreaks: (state) => {
-      state.gym = false;
-      state.study = false;
-      state.meditation = false;
+
+    // NEW: Set the entire list at once (from Setup Screen)
+    setAllActions: (state, action) => {
+      state.actions = action.payload;
+    },
+    
+    // NEW: Add a single custom action
+    addNewAction: (state, action) => {
+      state.actions.push({ ...action.payload, completed: false });
     }
   },
 });
 
-export const { markStreakCompleted, resetStreaks } = streakSlice.actions;
+export const { markStreakCompleted, setAllActions, addNewAction } = streakSlice.actions;
 export default streakSlice.reducer;

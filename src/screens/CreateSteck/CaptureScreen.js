@@ -76,7 +76,7 @@ export default function CaptureScreen({ navigation, route }) {
     setLoading(true);
     setTimeout(() => {
       // Simulate validation (Replace this with real logic later)
-      const isValid = Math.random() > 0.5; 
+      const isValid = Math.random() > 0.1; 
       
       setResult(isValid ? 'success' : 'failed');
       setLoading(false);

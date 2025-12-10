@@ -5,6 +5,7 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen';
 import HomeNavigator from './HomeNavigator';
 import { AuthContext } from '../context/AuthContext';
+import SetupRoutineScreen from "../screens/Onboarding/SetupRoutineScreen.js"
 
 
 const Stack = createStackNavigator();
@@ -24,6 +25,7 @@ export default function AppNavigator() {
       ) : (
         /* If user is logged in → go to Home */
         <>
+          <Stack.Screen name="SetupRoutine" component={SetupRoutineScreen} />
           <Stack.Screen name="HomeStack" component={HomeNavigator} />
         </>
       )}

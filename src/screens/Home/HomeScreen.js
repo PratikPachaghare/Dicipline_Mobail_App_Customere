@@ -16,17 +16,23 @@ export default function Dashboard({ navigation }) {
   // --- 1. REDUX DATA ---
   const streaks = useSelector((state) => state.streaks) || {};
 
-  // --- 2. DEFINE STREAK ACTIONS ---
-  const quickActions = [
-    { id: 'gym', title: 'Gym', subtitle: 'Start workout', icon: 'barbell-outline' },
-    { id: 'yoga', title: 'Yoga', subtitle: 'Morning Stretch', icon: 'body-outline' },
-    { id: 'study', title: 'Study', subtitle: 'Start session', icon: 'create-outline' },
-    { id: 'meditation', title: 'Meditation', subtitle: 'Relax & focus', icon: 'leaf-outline' },
-  ];
+// --- 1. REDUX DATA ---
+// We only need the 'actions' array. It contains everything (id, title, AND completed status).
+const quickActions = useSelector((state) => state.streaks.actions) || [];
 
-  // Filter Streaks
-  const completedStreaks = quickActions.filter((action) => streaks[action.id] === true);
-  const incompleteStreaks = quickActions.filter((action) => !streaks[action.id]);
+const completedStreaks = quickActions.filter((action) => action.completed === true);
+const incompleteStreaks = quickActions.filter((action) => !action.completed);
+
+  // --- 2. DEFINE STREAK ACTIONS ---
+  // const quickActions = [
+  //   { id: 'gym', title: 'Gym', subtitle: 'Start workout', icon: 'barbell-outline' },
+  //   { id: 'yoga', title: 'Yoga', subtitle: 'Morning Stretch', icon: 'body-outline' },
+  //   { id: 'study', title: 'Study', subtitle: 'Start session', icon: 'create-outline' },
+  //   { id: 'meditation', title: 'Meditation', subtitle: 'Relax & focus', icon: 'leaf-outline' },
+  // ];
+  // // Filter Streaks
+  // const completedStreaks = quickActions.filter((action) => streaks[action.id] === true);
+  // const incompleteStreaks = quickActions.filter((action) => !streaks[action.id]);
 
   // --- 3. TASKS STATE ---
   const [showMore, setShowMore] = useState(false);
@@ -159,6 +165,37 @@ export default function Dashboard({ navigation }) {
           </ScrollView>
         </View>
 
+        {/* ---------- DISCIPLINE STREAK CARD ---------- */}
+        <View style={[styles.card, styles.streakCard]}>
+          <Image
+            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2017/2017997.png' }}
+            style={styles.streakIcon}
+          />
+          <View style={{ marginLeft: 10, flex: 1 }}>
+            <Text style={styles.streakLabelLarge}>Discipline Streak</Text>
+            <Text style={styles.streakDays}>{disciplineStreak} days</Text>
+            
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+                {/* Existing Keep Going Button */}
+                <TouchableOpacity style={styles.streakBtn}>
+                  <Text style={styles.streakBtnText}>Keep Going</Text>
+                </TouchableOpacity>
+
+                {/* NEW SHARE BUTTON */}
+                <TouchableOpacity 
+                    style={[styles.streakBtn, { backgroundColor: '#FFD700' }]}
+                    onPress={() => navigation.navigate('ShareStreak', { 
+                        streakCount: disciplineStreak, 
+                        streakType: "Daily Goals" 
+                    })}
+                >
+                  <Text style={[styles.streakBtnText, { color: '#333' }]}>Share 🚀</Text>
+                </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+
         {/* TASKS */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Your Tasks</Text>
@@ -185,23 +222,18 @@ export default function Dashboard({ navigation }) {
         </View>
 
         {/* DISCIPLINE CARD */}
-        <View style={[styles.card, styles.streakCard]}>
+        {/* <View style={[styles.card, styles.streakCard]}>
           <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/2017/2017997.png' }} style={styles.streakIcon} />
           <View style={{ marginLeft: 10 }}>
             <Text style={styles.streakLabelLarge}>Discipline Streak</Text>
             <Text style={styles.streakDays}>{disciplineStreak} days</Text>
             <TouchableOpacity style={styles.streakBtn}><Text style={styles.streakBtnText}>Keep Going</Text></TouchableOpacity>
           </View>
-        </View>
+        </View> */}
+
         <View style={{ height: 80 }} />
       </ScrollView>
-
-      {/* BOTTOM NAV */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navBtn}><Ionicons name="home" size={22} color="#333" /><Text style={styles.navLabel}>Home</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navBtn}><Ionicons name="list" size={22} color="#333" /><Text style={styles.navLabel}>Tasks</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.navBtn}><Ionicons name="person" size={22} color="#333" /><Text style={styles.navLabel}>Profile</Text></TouchableOpacity>
-      </View>
+     
     </SafeAreaView>
   );
 }
