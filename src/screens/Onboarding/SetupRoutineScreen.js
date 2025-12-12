@@ -6,14 +6,15 @@ import {
   TextInput,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Alert,
   Modal
 } from 'react-native';
+// FIX: Import SafeAreaView from the correct package
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useDispatch } from 'react-redux';
-import { setAllActions } from '../../Store/steackSlice.js'; // Adjust path
+import { setAllActions } from '../../Store/steackSlice.js'; 
 
 export default function SetupRoutineScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -85,8 +86,6 @@ export default function SetupRoutineScreen({ navigation }) {
     dispatch(setAllActions(selectedTasks));
     
     // Navigate to Home
-    // If you are using Stack Navigator inside App.js, you might need to 'replace' 
-    // to prevent going back to setup.
     navigation.replace('HomeStack'); 
   };
 

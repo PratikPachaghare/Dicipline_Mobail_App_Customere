@@ -11,14 +11,19 @@ import HomeScreen from '../screens/Home/HomeScreen';
 import TaskListScreen from '../screens/Tasks/TaskListScreen';
 import AddTaskScreen from '../screens/Tasks/AddTaskScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
-import StatsScreen from '../screens/Stats/StatsScreen';
+import StatsScreen from '../screens/Stats/StatsOverview';
 import CaptureScreen from '../screens/CreateSteck/CaptureScreen';
 import ShareStreakScreen from '../screens/SocialMedia/ShareStreakScreen';
+import FriendsScreen from "../screens/Firend/FirendScreen";
+import ChatScreen from "../screens/Firend/ChatScreen";
+import LeaderboardScreen from "../screens/Leaderboard/LeaderboardScreen"
+import CommitmentScreen from "../screens/HardComiiteSection/CommitmentScreen"
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // 1. Create the Bottom Tabs (Home, Tasks, Profile)
+// 1. Create the Bottom Tabs
 function BottomTabs() {
   return (
     <Tab.Navigator
@@ -26,12 +31,23 @@ function BottomTabs() {
         headerShown: false,
         tabBarActiveTintColor: '#333',
         tabBarInactiveTintColor: '#999',
-        tabBarStyle: styles.bottomNav, // Uses your style
+        tabBarStyle: styles.bottomNav,
+        // FIX IS HERE:
         tabBarIcon: ({ color, size }) => {
           let iconName;
-          if (route.name === 'HomeTab') iconName = 'home';
-          else if (route.name === 'TasksTab') iconName = 'list';
-          else if (route.name === 'ProfileTab') iconName = 'person';
+
+          if (route.name === 'HomeTab') {
+            iconName = 'home';
+          } 
+          // Add this block for your new Chat tab
+          else if (route.name === 'Chat') {
+            iconName = 'chatbubble-ellipses'; // Or 'chatbubbles', 'people'
+          } 
+          else if (route.name === 'ProfileTab') {
+            iconName = 'person';
+          }
+
+          // Return the icon component
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
@@ -41,11 +57,14 @@ function BottomTabs() {
         component={HomeScreen} 
         options={{ tabBarLabel: 'Home' }} 
       />
+      
+      {/* This is your new tab */}
       <Tab.Screen 
-        name="TasksTab" 
-        component={TaskListScreen} 
-        options={{ tabBarLabel: 'Tasks' }} 
+        name="Chat" 
+        component={FriendsScreen} 
+        options={{ tabBarLabel: 'Friend' }} 
       />
+      
       <Tab.Screen 
         name="ProfileTab" 
         component={ProfileScreen} 
@@ -64,6 +83,10 @@ export default function HomeNavigator() {
       <Stack.Screen name="MainTabs" component={BottomTabs} />
 
       {/* Other screens that sit ON TOP of the tabs (Full Screen) */}
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+      <Stack.Screen name="Commitment" component={CommitmentScreen} />
+      <Stack.Screen name="Friends" component={FriendsScreen} />
+      <Stack.Screen name="ChatScreen" component={ChatScreen} />
       <Stack.Screen name="Capture" component={CaptureScreen} />
       <Stack.Screen name="ShareStreak" component={ShareStreakScreen} />
       <Stack.Screen name="AddTask" component={AddTaskScreen} />
