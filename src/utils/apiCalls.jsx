@@ -1,82 +1,112 @@
-import axios from "axios";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from './api';
 
-// 🔹 Base API URL (change to your backend)
-const BASE_URL = "https://example.com/api";
-
-// 🔹 Main reusable API call
-export const apiCall = async (method, endpoint, data = {}, params = {}) => {
+export default apiCall = async (method, endpoint, data = {}, params = {}) => {
   try {
-    const response = await axios({
+    const response = await api({
       method,
-      url: `${BASE_URL}${endpoint}`,
+      url: endpoint,
       data,
       params,
+    });
+    return response.data;
+  } catch (error) {
+    console.log('API Error:', endpoint, error?.response?.data || error.message);
+    return null;
+  }
+};
+
+import axios from "axios";
+
+const BASE_URL = "http://10.0.2.2:5000/api";
+
+export const apiCallImage = async (
+  method,
+  endpoint,
+  formData,
+  params = {}
+) => {
+  try {
+    const token = await AsyncStorage.getItem('token');
+
+    // Build query params
+    const query = new URLSearchParams(params).toString();
+    const url = `${BASE_URL}${endpoint}${query ? `?${query}` : ''}`;
+
+    console.log(`📸 Image API → ${method} ${url}`);
+
+    const response = await fetch(url, {
+      method,
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type' :'multipart/form-data',
+        Authorization: `Bearer ${token}`,
       },
+      body: formData,
     });
 
-    console.log("API Success:", endpoint, response.data);
-    return response.data;
+    const result = await response.json();
 
+    if (!response.ok) {
+      console.log('❌ Image API Error:', result);
+      return null;
+    }
+
+    return result;
   } catch (error) {
-    console.log("API Error:", endpoint, error?.response?.data || error.message);
+    console.log('❌ Image API Error:', error.message);
     return null;
   }
 };
 
 
-// ----------------------------------------------------
-// 🔹 AUTH API
-// ----------------------------------------------------
-export const loginUser = (email, password) => {
-  return apiCall("POST", "/auth/login", { email, password });
+
+export const apiCallAuth = async (method, endpoint, data = {}, params = {}) => {
+  try {
+    const url = `${BASE_URL}${endpoint}`;
+    console.log(`📡 Sending ${method} to ${url}`);
+    
+    let response;
+
+    // Use specific methods to ensure Axios handles the body correctly
+    if (method.toUpperCase() === 'POST') {
+      response = await axios.post(url, data, {
+        headers: { 'Content-Type': 'application/json' },
+        params: params
+      });
+    } else if (method.toUpperCase() === 'GET') {
+      response = await axios.get(url, {
+        headers: { 'Content-Type': 'application/json' },
+        params: params
+      });
+    }
+
+    return response.data;
+  } catch (error) {
+    console.log('❌ Auth API Error:', error.response?.data || error.message);
+    return error.response?.data || null;
+  }
 };
 
-export const signupUser = (name, email, password) => {
-  return apiCall("POST", "/auth/signup", { name, email, password });
-};
+export const verifyToken = async (method, endpoint, token, params = {}) => {
+  try {
+   
+    const response = await axios({
+      method,
+      url: BASE_URL + endpoint,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-// ----------------------------------------------------
-// 🔹 USER API
-// ----------------------------------------------------
-export const getUserProfile = (userId) => {
-  return apiCall("GET", `/user/profile/${userId}`);
-};
-
-export const updateUserProfile = (userId, data) => {
-  return apiCall("PUT", `/user/update/${userId}`, data);
-};
-
-// ----------------------------------------------------
-// 🔹 TASKS API (Discipline App Feature)
-// ----------------------------------------------------
-export const addTask = (title, description) => {
-  return apiCall("POST", "/task/add", {
-    title,
-    description,
-  });
-};
-
-export const getAllTasks = () => {
-  return apiCall("GET", "/task/all");
-};
-
-export const updateTask = (taskId, data) => {
-  return apiCall("PUT", `/task/update/${taskId}`, data);
-};
-
-export const deleteTask = (taskId) => {
-  return apiCall("DELETE", `/task/delete/${taskId}`);
-};
-
-// ----------------------------------------------------
-// 🔹 LOGS / TRACKER (habits, discipline, daily tracking)
-// ----------------------------------------------------
-export const addDailyLog = (type, value) => {
-  return apiCall("POST", "/logs/add", { type, value });
-};
-
-export const getDailyLogs = (date) => {
-  return apiCall("GET", "/logs/date", {}, { date });
+    return response;
+  } catch (error) {
+    console.log(
+      'veryToken API Error:',
+      endpoint,
+      error?.response?.data || error.message,
+    );
+    return null;
+  }
 };

@@ -1,33 +1,88 @@
-// src/store/streakSlice.js
 import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
-  // Start empty or with defaults? Let's start empty so user MUST pick.
-  actions: [], 
+  actions: [],
+  weekly: [],
+  // ✅ FIX 1: Simplify keys to 'current' and 'longest'
+  streak: {
+    current: 0,  
+    longest: 0,  
+  },
 };
 
 const streakSlice = createSlice({
   name: 'streaks',
   initialState,
   reducers: {
-    // ... existing reducers ...
-    markStreakCompleted: (state, action) => {
-      const targetId = action.payload;
-      const item = state.actions.find((i) => i.id === targetId);
-      if (item) item.completed = true;
-    },
 
-    // NEW: Set the entire list at once (from Setup Screen)
+    // =========================
+    // 🔹 QUICK ACTIONS
+    // =========================
     setAllActions: (state, action) => {
       state.actions = action.payload;
     },
-    
-    // NEW: Add a single custom action
+
     addNewAction: (state, action) => {
       state.actions.push({ ...action.payload, completed: false });
-    }
+    },
+
+    markStreakCompleted: (state, action) => {
+      const item = state.actions.find(i => i.id === action.payload);
+      if (item) item.completed = true;
+    },
+
+    // =========================
+    // 🔹 WEEKLY STREAK
+    // =========================
+    setWeeklyStreak: (state, action) => {
+      state.weekly = action.payload;
+    },
+
+    markWeeklyDone: (state, action) => {
+      const day = state.weekly.find(d => d.day === action.payload);
+      if (day) day.completed = true;
+    },
+
+    // =========================
+    // 🔹 STREAKS (CURRENT + LONGEST)
+    // =========================
+    setStreaks: (state, action) => {
+      const incoming = action.payload || {};
+
+      // ✅FIX 2: Map API keys (backend) to State keys (frontend)
+      // Backend bheje 'currentStreak', hum store karenge 'current' mein
+      state.streak.current = incoming.currentStreak ?? 0;
+
+      // Backend bheje 'longestStreak' ya 'LongestStreak', hum store karenge 'longest' mein
+      state.streak.longest = incoming.longestStreak ?? incoming.LongestStreak ?? 0;
+    },
+
+    incrementCurrentStreak: (state) => {
+      // ✅ FIX 3: Use 'current' consistent with initialState
+      state.streak.current += 1;
+      
+      // ✅ FIX 4: Use 'longest' consistent with initialState
+      if (state.streak.current > state.streak.longest) {
+        state.streak.longest = state.streak.current;
+      }
+    },
+
+    resetCurrentStreak: (state) => {
+      // ✅ FIX 5: Use 'current' consistent with initialState
+      state.streak.current = 0;
+    },
   },
 });
 
-export const { markStreakCompleted, setAllActions, addNewAction } = streakSlice.actions;
+export const {
+  setAllActions,
+  addNewAction,
+  markStreakCompleted,
+  setWeeklyStreak,
+  markWeeklyDone,
+  setStreaks,
+  incrementCurrentStreak,
+  resetCurrentStreak,
+} = streakSlice.actions;
+
 export default streakSlice.reducer;

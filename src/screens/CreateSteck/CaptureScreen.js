@@ -10,30 +10,28 @@ import {
   PermissionsAndroid,
   Alert,
 } from 'react-native';
-import { Camera, useCameraDevice } from 'react-native-vision-camera';
-import RNFS from 'react-native-fs';
-import Icon from 'react-native-vector-icons/Ionicons';
 
-// REDUX IMPORTS
-import { useDispatch } from 'react-redux';
-import { markStreakCompleted } from '../../Store/steackSlice.js'; // Adjust path as needed
+import { Camera, useCameraDevice } from 'react-native-vision-camera';
+import Icon from 'react-native-vector-icons/Ionicons';
+// import ImageResizer from 'react-native-image-resizer';
+
+import apiCall, { apiCallImage } from '../../utils/apiCalls';
+import apiEndpoint from '../../utils/endpoint';
 
 export default function CaptureScreen({ navigation, route }) {
-  const { streakType } = route.params || {}; // e.g., "gym"
-  const cameraRef = useRef(null);
+  const { streakType, taskId } = route.params || {};
 
-  // REDUX DISPATCH
-  const dispatch = useDispatch();
+  const cameraRef = useRef(null);
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
 
   const [streakStarted, setStreakStarted] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const scaleAnim = useRef(new Animated.Value(0.5)).current;
 
   const device = useCameraDevice('back');
 
+  /* ================= CAMERA PERMISSION ================= */
   const requestCameraPermission = async () => {
     if (Platform.OS === 'android') {
       const granted = await PermissionsAndroid.request(
@@ -45,120 +43,194 @@ export default function CaptureScreen({ navigation, route }) {
     return status === 'granted';
   };
 
+  /* ================= IMAGE COMPRESSION ================= */
+  // const compressImage = async (imagePath) => {
+  //   try {
+  //     const cleanPath =
+  //       Platform.OS === 'android'
+  //         ? imagePath.replace('file://', '')
+  //         : imagePath;
+
+  //     const compressed = await ImageResizer.createResizedImage(
+  //       cleanPath,
+  //       1024,
+  //       1024,
+  //       'JPEG',
+  //       70,
+  //       0
+  //     );
+
+  //     return Platform.OS === 'android'
+  //       ? `file://${compressed.path}`
+  //       : compressed.uri;
+  //   } catch (error) {
+  //     console.error('Image compression error:', error);
+  //     return imagePath;
+  //   }
+  // };
+
+  /* ================= START STREAK ================= */
   const startStreak = async () => {
     const granted = await requestCameraPermission();
-    if (granted) {
-      setStreakStarted(true);
-      setCameraOpen(true);
-    } else {
+    if (!granted) {
       Alert.alert('Permission Denied', 'Camera access is needed.');
+      return;
     }
+
+    setStreakStarted(true);
+    setCameraOpen(true);
+    setResult(null);
   };
 
+  /* ================= TAKE PICTURE ================= */
   const handleTakePicture = async () => {
-    if (cameraRef.current) {
-      try {
-        const photoData = await cameraRef.current.takePhoto({ flash: 'off' });
-        const localPath = `${RNFS.CachesDirectoryPath}/streak_${Date.now()}.jpg`;
-        await RNFS.copyFile(photoData.path, localPath);
+    if (!cameraRef.current) return;
 
-        setPhoto({ ...photoData, localPath });
-        setCameraOpen(false);
-        handleValidate(); 
-      } catch (e) {
-        console.error(e);
-        Alert.alert('Error', 'Failed to take photo');
-      }
+    try {
+      const photo = await cameraRef.current.takePhoto({ flash: 'off' });
+      const originalPath = `file://${photo.path}`;
+
+      const compressedPath = originalPath;
+
+      setCameraOpen(false);
+      handleValidate(compressedPath);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to take photo');
     }
   };
 
-  const handleValidate = async () => {
+  /* ================= UPLOAD IMAGE ================= */
+  const handleValidate = async imagePath => {
     setLoading(true);
-    setTimeout(() => {
-      // Simulate validation (Replace this with real logic later)
-      const isValid = Math.random() > 0.1; 
-      
-      setResult(isValid ? 'success' : 'failed');
-      setLoading(false);
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
 
-      // --- REDUX LOGIC HERE ---
-      if (isValid && streakType) {
-        // Dispatch action to store: "gym" is completed
-        dispatch(markStreakCompleted(streakType.toLowerCase()));
+    try {
+      if (!taskId) {
+        Alert.alert('Error', 'Task ID is missing.');
+        return;
       }
-      
-    }, 2000);
+
+      const formData = new FormData();
+      formData.append('image', {
+        uri: imagePath,
+        type: 'image/jpeg',
+        name: 'task_evidence.jpg',
+      });
+
+      const response = await apiCallImage(
+        'POST',
+        apiEndpoint.task.completeTask(taskId),
+        formData,
+      );
+
+      if (response?.success) {
+        setResult('success');
+        navigation.goBack();
+      } else {
+        setResult('failed');
+        Alert.alert(
+          'Validation Failed',
+          response?.message || 'AI could not verify this task.',
+        );
+      }
+    } catch (error) {
+      console.error('Validation Error:', error);
+      setResult('failed');
+      Alert.alert('Error', 'Network request failed.');
+    } finally {
+      setLoading(false);
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
-  const showCamera = cameraOpen && device != null;
-  const showSimulatorWarning = cameraOpen && device == null;
+  const showCamera = cameraOpen && device;
 
+  /* ================= UI ================= */
   return (
     <View style={styles.container}>
-      {/* SECTION A: Start Button */}
       {!streakStarted && !loading && !result && (
         <View style={styles.centered}>
           <Text style={styles.title}>Start Your Streak</Text>
-          <Text style={styles.subtitle}>Type: {streakType}</Text>
+          <Text style={styles.subtitle}>
+            Type: {streakType || 'General Task'}
+          </Text>
+
           <TouchableOpacity style={styles.button} onPress={startStreak}>
             <Text style={styles.buttonText}>▶ Start Streak</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* SECTION B: The Camera */}
       {showCamera && (
         <View style={StyleSheet.absoluteFill}>
           <Camera
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
             device={device}
-            isActive={true}
-            photo={true}
+            isActive
+            photo
           />
-          <TouchableOpacity style={styles.captureButton} onPress={handleTakePicture}>
-            <Text style={{ position: 'absolute', top: 28, color: 'red', fontWeight: 'bold' }}>SNAP</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.closeBtn} 
-            onPress={() => { setCameraOpen(false); setStreakStarted(false); }}
+
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={handleTakePicture}
           >
-            <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 17 }}> cancel </Text>
+            <View style={styles.shutterBtn} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => {
+              setCameraOpen(false);
+              setStreakStarted(false);
+            }}
+          >
+            <Icon name="close" size={30} color="#fff" />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* SECTION C: Simulator Warning */}
-      {showSimulatorWarning && (
-        <View style={styles.centered}>
-          <Text style={{ color: 'red', fontSize: 18 }}>No Camera Device Found</Text>
-          <TouchableOpacity style={styles.button} onPress={() => setCameraOpen(false)}>
-            <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* SECTION D: Loading */}
       {loading && (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#007bff" />
-          <Text style={styles.subtitle}>Validating...</Text>
+          <Text style={styles.subtitle}>AI is analyzing your evidence...</Text>
         </View>
       )}
 
-      {/* SECTION E: Result */}
       {!loading && result && (
-        <Animated.View style={[styles.centered, { transform: [{ scale: scaleAnim }] }]}>
-          <Icon name={result === 'success' ? 'checkmark-circle' : 'close-circle'} size={90} color={result === 'success' ? 'green' : 'red'} />
-          <Text style={[styles.title, { color: result === 'success' ? 'green' : 'red' }]}>
-            {result === 'success' ? 'Congratulations!' : 'Try Again!'}
-          </Text>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: result === 'success' ? 'green' : 'red' }]}
-            onPress={result === 'success' ? () => navigation.goBack() : () => { setResult(null); startStreak(); }}
+        <Animated.View
+          style={[styles.centered, { transform: [{ scale: scaleAnim }] }]}
+        >
+          <Icon
+            name={result === 'success' ? 'checkmark-circle' : 'close-circle'}
+            size={90}
+            color={result === 'success' ? 'green' : 'red'}
+          />
+
+          <Text
+            style={[
+              styles.title,
+              { color: result === 'success' ? 'green' : 'red' },
+            ]}
           >
-            <Text style={styles.buttonText}>{result === 'success' ? 'Continue' : 'Retry'}</Text>
+            {result === 'success' ? 'Streak Verified!' : 'Not Verified'}
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              styles.button,
+              { backgroundColor: result === 'success' ? 'green' : 'red' },
+            ]}
+            onPress={() =>
+              result === 'success' ? navigation.goBack() : startStreak()
+            }
+          >
+            <Text style={styles.buttonText}>
+              {result === 'success' ? 'Continue' : 'Retry'}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -166,13 +238,58 @@ export default function CaptureScreen({ navigation, route }) {
   );
 }
 
+/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
-  centered: { alignItems: 'center', gap: 12, padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#555', textAlign: 'center', marginBottom: 16 },
-  button: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#007bff', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24 },
-  buttonText: { color: 'white', fontSize: 16, fontWeight: '600' },
-  captureButton: { position: 'absolute', bottom: 50, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', backgroundColor: 'white', width: 80, height: 80, borderRadius: 40 },
-  closeBtn: { position: 'absolute', top: 50, right: 20, backgroundColor: '#ae4141ff', padding: 10, borderRadius: 50 },
+  container: {
+    flex: 1,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centered: {
+    alignItems: 'center',
+    gap: 12,
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+  },
+  button: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  captureButton: {
+    position: 'absolute',
+    bottom: 50,
+    alignSelf: 'center',
+  },
+  shutterBtn: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#ccc',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 10,
+    borderRadius: 50,
+  },
 });

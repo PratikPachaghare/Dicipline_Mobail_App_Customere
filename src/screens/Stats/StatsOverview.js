@@ -13,11 +13,18 @@ const StatBox = ({ label, value, icon, color }) => (
   </View>
 );
 
-export default function StatsOverview({ streaksCount, completedCount, habitsCount }) {
+export default function StatsOverview({ 
+          habitsCount,
+          streakDays,
+          streak }) {
+  const streakCountCurrent = streak.current;
+  const streakCountLongest = streak.longest;
+  const completedCount = 20;
+
   return (
     <View style={styles.statsContainer}>
-      <StatBox label="Best Streak" value={streaksCount} icon="flame" color="#FF4500" />
-      <StatBox label="Completed" value={completedCount} icon="checkmark" color="#4CD964" />
+      <StatBox label="Current Streak" value={streakCountCurrent} icon="checkmark" color="#4CD964" />
+      <StatBox label="Best Streak" value={streakCountLongest} icon="flame" color="#FF4500" />
       <StatBox label="Total Habits" value={habitsCount} icon="list" color="#6B6BFF" />
       <StatBox label="Completion %" value="85%" icon="analytics" color="#FFD700" />
     </View>

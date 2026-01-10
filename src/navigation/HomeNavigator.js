@@ -18,6 +18,7 @@ import FriendsScreen from "../screens/Firend/FirendScreen";
 import ChatScreen from "../screens/Firend/ChatScreen";
 import LeaderboardScreen from "../screens/Leaderboard/LeaderboardScreen"
 import CommitmentScreen from "../screens/HardComiiteSection/CommitmentScreen"
+import SettingTask from '../screens/Home/Components/SettingTask';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -91,6 +92,7 @@ export default function HomeNavigator() {
       <Stack.Screen name="ShareStreak" component={ShareStreakScreen} />
       <Stack.Screen name="AddTask" component={AddTaskScreen} />
       <Stack.Screen name="Stats" component={StatsScreen} />
+      <Stack.Screen name="SettingTask" component={SettingTask} />
 
     </Stack.Navigator>
   );
