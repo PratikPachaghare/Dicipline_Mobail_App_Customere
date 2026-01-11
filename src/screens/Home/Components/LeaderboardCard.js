@@ -1,8 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useSelector } from 'react-redux';
+
+
 
 export default function LeaderboardCard({ onPress }) {
+const rank = useSelector(state => state.streaks.Rank.currentRank) || '-';
+
   return (
     <TouchableOpacity
       style={styles.leaderboardCard}
@@ -16,7 +21,7 @@ export default function LeaderboardCard({ onPress }) {
         <View style={styles.lbTextContainer}>
           <Text style={styles.lbTitle}>Leaderboard</Text>
           <Text style={styles.lbSubtitle}>
-            You are ranked <Text style={{ fontWeight: 'bold', color: '#FFD700' }}>#2</Text> this week!
+            You are ranked <Text style={{ fontWeight: 'bold', color: '#FFD700' }}>#{rank}</Text> this week!
           </Text>
         </View>
       </View>

@@ -3,7 +3,7 @@ import { SafeAreaView, ScrollView, StatusBar, StyleSheet, View } from 'react-nat
 import { useIsFocused } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { addAction } from '../../Store/steackSlice'; 
-import { loadQuickActions, loadStreaks, loadWeeklyStreak } from './Components/DashbordLogic';
+import { fetchMyRank, loadQuickActions, loadStreaks, loadWeeklyStreak } from './Components/DashbordLogic';
 
 // Import Components
 import DashboardHeader from './Components/DashboardHeader';
@@ -29,6 +29,7 @@ export default function Dashboard({ navigation }) {
       loadQuickActions(dispatch);
       loadWeeklyStreak(dispatch);
       loadStreaks(dispatch);
+      fetchMyRank(dispatch);
     }
   }, [isFocused, dispatch]);
 

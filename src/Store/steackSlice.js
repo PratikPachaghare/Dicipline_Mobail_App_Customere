@@ -3,10 +3,12 @@ import { createSlice } from '@reduxjs/toolkit';
 const initialState = {
   actions: [],
   weekly: [],
-  // ✅ FIX 1: Simplify keys to 'current' and 'longest'
   streak: {
     current: 0,  
     longest: 0,  
+  },
+  Rank: {
+    currentRank: 0,    
   },
 };
 
@@ -48,20 +50,22 @@ const streakSlice = createSlice({
     // =========================
     setStreaks: (state, action) => {
       const incoming = action.payload || {};
-
-      // ✅FIX 2: Map API keys (backend) to State keys (frontend)
       // Backend bheje 'currentStreak', hum store karenge 'current' mein
       state.streak.current = incoming.currentStreak ?? 0;
-
       // Backend bheje 'longestStreak' ya 'LongestStreak', hum store karenge 'longest' mein
       state.streak.longest = incoming.longestStreak ?? incoming.LongestStreak ?? 0;
     },
 
+    setRank: (state, action) => {
+      const incoming = action.payload || {};
+      state.Rank.currentRank = incoming.rank ?? 0;
+    },
+
     incrementCurrentStreak: (state) => {
-      // ✅ FIX 3: Use 'current' consistent with initialState
+      // FIX 3: Use 'current' consistent with initialState
       state.streak.current += 1;
       
-      // ✅ FIX 4: Use 'longest' consistent with initialState
+      //  FIX 4: Use 'longest' consistent with initialState
       if (state.streak.current > state.streak.longest) {
         state.streak.longest = state.streak.current;
       }
@@ -83,6 +87,7 @@ export const {
   setStreaks,
   incrementCurrentStreak,
   resetCurrentStreak,
+  setRank,
 } = streakSlice.actions;
 
 export default streakSlice.reducer;

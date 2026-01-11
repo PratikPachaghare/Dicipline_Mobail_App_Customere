@@ -29,7 +29,7 @@ const AVAILABLE_WIDTH = SCREEN_WIDTH - CONTAINER_PADDING;
 const DAY_SIZE = AVAILABLE_WIDTH / 7;
 const BOX_SIZE = DAY_SIZE - 10; // Leave a small gap between boxes
 
-export default function HabitHeatmap() {
+export default function HetmapByUserId({userId}) {
   // 1. ALL HOOKS FIRST
   const [showAll, setShowAll] = useState(false);
   const [heatmapData, setHeatmapData] = useState([]);
@@ -46,7 +46,7 @@ export default function HabitHeatmap() {
     try {
       const response = await apiCall(
         'GET',
-        apiEndpoint?.heatmap?.activity_heatmap,
+        apiEndpoint?.heatmap?.heatmap_userId(userId),
       );
       if (response?.success && response?.data) {
         setHeatmapData(transformBackendData(response.data));
@@ -160,7 +160,7 @@ export default function HabitHeatmap() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Consistency Graph 📅</Text>
-           <View style={styles.legend}>
+              <View style={styles.legend}>
         <Text style={styles.legendText}>Less</Text>
         <View style={[styles.legendBox, { backgroundColor: '#ebedf0' }]} />
         <View style={[styles.legendBox, { backgroundColor: '#9be9a8' }]} />
@@ -250,7 +250,7 @@ export default function HabitHeatmap() {
         />
       </TouchableOpacity>
 
-   
+
     </View>
   );
 }

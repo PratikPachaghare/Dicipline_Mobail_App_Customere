@@ -3,7 +3,8 @@
 import { 
   setAllActions, 
   setWeeklyStreak, 
-  setStreaks 
+  setStreaks, 
+  setRank
 } from '../../../Store/steackSlice';
 import apiCall from '../../../utils/apiCalls'; 
 import apiEndpoint from '../../../utils/endpoint'; 
@@ -55,3 +56,11 @@ export const loadStreaks = async (dispatch) => {
     console.log('Streak load failed', e);
   }
 };
+
+export const fetchMyRank = async (dispatch) => {
+    const res = await apiCall('GET', apiEndpoint?.leaderboard?.weakly_my_rank);
+    console.log("Rank Data to Save:", res);
+    if (res?.success) {
+      dispatch(setRank(res));
+    }
+  };

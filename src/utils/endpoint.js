@@ -23,6 +23,19 @@ export default apiEndpoint = {
         sreack_data:"/streak/streak-count"
     },
     heatmap : {
-        activity_heatmap:"activityHeatmap/activity-heatmap"
-    }
+        activity_heatmap:"activityHeatmap/activity-heatmap",
+        heatmap_userId: (userId)=> `/activityHeatmap/heatmap_userId/${userId}`
+    },
+    leaderboard : {
+        weakly_my_rank: "/leaderboard/my-rank",
+        weakly_Leaderboard : "/leaderboard/weeklyLeaderbord",
+        leaderboard_profile:(userId) => `/leaderboard/leaderboard-profile/${userId}`
+    },
+    chat: {
+        list: '/chat/list',           // GET: Active chats
+        pending: '/chat/pending',     // GET: Pending requests
+        suggestions: '/chat/suggestions', // GET: Users to invite
+        invite: '/chat/invite',       // POST: Send invite
+        accept: '/chat/accept',       // POST: Accept invite
+  }
 }
