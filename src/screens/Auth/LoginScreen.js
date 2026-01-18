@@ -3,57 +3,90 @@ import { useContext, useState } from 'react';
 import InputBox from '../../components/InputBox';
 import PrimaryButton from '../../components/PrimaryButton';
 import { AuthContext } from '../../context/AuthContext';
-import  { apiCallAuth }  from '../../utils/apiCalls';
-import  apiEndpoint  from '../../utils/endpoint';
+import { apiCallAuth, savePrivateKey } from '../../utils/apiCalls';
+import apiEndpoint from '../../utils/endpoint';
+import { decryptPrivateKeyWithPassword, encryptPrivateKeyWithPassword } from '../../utils/cryptoHelper';
+import ProductiveLoader from '../../components/ProductiveLoader';
 
 export default function LoginScreen({ navigation }) {
   const { login } = useContext(AuthContext);
-
+  const [isLoading, setIsLoading] = useState(false);
+  const [loaderMessage, setLoaderMessage] = useState("Initializing...");
   const [loginType, setLoginType] = useState('email'); // email | phone
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [pass, setPass] = useState('');
 
-const handleLogin = async () => {
-  try {
-    console.log('Login Called', loginType, email, phone, pass);
+  const handleLogin = async () => {
+    setIsLoading(true);
+    try {
 
-    const response = await apiCallAuth(
-      'POST',
-      apiEndpoint?.auth?.login,
-      {
+      console.log('Login Called', loginType, email, phone, pass);
+      setLoaderMessage("Securing your identity..."); 
+      const response = await apiCallAuth('POST', apiEndpoint?.auth?.login, {
         email: loginType === 'email' ? email : null,
         phone: loginType === 'phone' ? phone : null,
         password: pass,
-      }
-    );
-
-    // 🔎 Example backend response
-    // {
-    //   success: true,
-    //   token: "jwt_token_here",
-    //   user: { _id, name, email }
-    // }
-    console.log("response ",response);
-
-    if (response?.token) {
-      // 🔐 Save token + user in AuthContext (AsyncStorage handled there)
-      login({
-        token: response.token,
-        user: response.user,
       });
-    } else {
-      console.log('Invalid login response');
+
+
+      console.log('response ', response);
+      setLoaderMessage("verfy validate account..."); 
+      if (response?.token) {
+        if (response.user.encryptedPrivateKey) {
+          setLoaderMessage("create uniw key"); 
+          console.log('Found backup key on server...');
+
+          // Unlock using the password user just entered
+          const originalPrivateKey = decryptPrivateKeyWithPassword(
+            response.user.encryptedPrivateKey,
+            password=pass,
+          );
+
+          if (originalPrivateKey) {
+            await savePrivateKey(response.user.id, originalPrivateKey);
+            console.log('Old keys restored successfully! ✅');
+          } else {
+            console.log(
+              'Password changed or key corrupted. Old chats unreadable.',
+            );
+          }
+        } else {
+          // Agar user purana hai aur uske paas backup key nahi thi
+          console.log(
+            'No backup key found. Generating new keys (Old chats lost).',
+          );
+          // const newKeys = await generateKeyPairs();
+          // await savePrivateKey(response.user.id, newKeys.private);
+
+          // await apiCallAuth('PUT', apiEndpoint?.auth?.updateKeys, {
+          //   publicKey: newKeys.public,
+          //   encryptedPrivateKey: encryptPrivateKeyWithPassword(
+          //     newKeys.private,
+          //     pass
+          //   ),
+          // });
+
+          // console.log('Server updated with NEW keys successfully.');
+        }
+        setLoaderMessage("login user..."); 
+        login({
+          token: response.token,
+          user: response.user,
+        });
+      } else {
+        console.log('Invalid login response');
+      }
+    } catch (error) {
+      console.log('Login Error:', error?.message || error);
     }
-
-  } catch (error) {
-    console.log('Login Error:', error?.message || error);
-  }
-};
-
+    setIsLoading(false);
+  };
 
   return (
     <View style={styles.container}>
+
+      <ProductiveLoader visible={isLoading} message={loaderMessage} />
       <Text style={styles.title}>Login 🔐</Text>
 
       {/* Toggle Buttons */}

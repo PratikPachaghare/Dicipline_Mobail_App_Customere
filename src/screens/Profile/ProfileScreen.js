@@ -78,7 +78,7 @@ export default function ProfileScreen({ navigation }) {
         <RecentHistory data={historyData} />
 
         {/* 5. PASS LOGOUT TO SETTINGS */}
-        <AccountSettings onLogout={logout} />
+        <AccountSettings onLogout={logout} userID={user.id} />
         
         <View style={{ height: 40 }} />
       </ScrollView>

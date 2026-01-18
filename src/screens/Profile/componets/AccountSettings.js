@@ -18,7 +18,7 @@ const MenuOption = ({ icon, title, isDestructive, onPress }) => (
   </TouchableOpacity>
 );
 
-export default function AccountSettings({ onLogout }) {
+export default function AccountSettings({ onLogout,userID }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Account</Text>
@@ -26,7 +26,7 @@ export default function AccountSettings({ onLogout }) {
         <MenuOption icon="notifications-outline" title="Notifications" />
         <MenuOption icon="shield-checkmark-outline" title="Privacy & Security" />
         <MenuOption icon="help-circle-outline" title="Help & Support" />
-        <MenuOption icon="log-out-outline" title="Log Out" isDestructive onPress={onLogout} />
+        <MenuOption icon="log-out-outline" title="Log Out" isDestructive onPress={() => onLogout(userID)} />
       </View>
     </View>
   );

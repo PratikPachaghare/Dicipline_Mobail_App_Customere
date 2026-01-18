@@ -6,6 +6,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { Provider } from 'react-redux';
 import { store } from './src/Store/store.js'; 
 
+
 export default function App() {
   return (
     <AuthProvider>

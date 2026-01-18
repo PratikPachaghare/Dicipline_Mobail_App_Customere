@@ -1,247 +1,326 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, 
-  Alert, FlatList, Image, KeyboardAvoidingView, Platform, ActivityIndicator 
+import {
+  View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet,
+  Alert, FlatList, Image, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import io from 'socket.io-client';
 import { launchImageLibrary } from 'react-native-image-picker';
 
-// UTILS
-import apiCall from '../../utils/apiCalls'; 
+// 👇 Imports updated
+import apiCall, { apiCallImageChat, encryptMessage, decryptMessage } from '../../utils/apiCalls'; 
 import apiEndpoint from '../../utils/endpoint';
-import { AuthContext } from '../../context/AuthContext'; 
-import { SERVER_URL } from '../../utils/api';
+import { AuthContext } from '../../context/AuthContext';
+import { SERVER_URL } from '../../utils/api'; 
 
+const SOCKET_URL = SERVER_URL;
 
-// ⚠️ REPLACE WITH YOUR BACKEND URL
-const SOCKET_URL = SERVER_URL; 
+const getImageUrl = (imgData) => {
+  if (!imgData) return 'https://via.placeholder.com/150';
+  if (typeof imgData === 'string') return imgData;
+  if (typeof imgData === 'object' && imgData.url) return imgData.url;
+  return 'https://via.placeholder.com/150';
+};
 
 export default function ChatScreen({ route, navigation }) {
-  const { user: currentUser } = useContext(AuthContext); 
-  const { user: friend, roomId } = route.params; 
+  const { user: currentUser } = useContext(AuthContext);
   
+  // Ensure friend object has publicKey
+  const { user: friend, roomId, unreadCount = 0 } = route.params;
+
   const [msg, setMsg] = useState('');
   const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
   
-  // Refs
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [initialScrollDone, setInitialScrollDone] = useState(false);
+
   const socket = useRef(null);
   const flatListRef = useRef(null);
 
   useEffect(() => {
-    // 1. Initialize Socket
     socket.current = io(SOCKET_URL);
-    
-    // 2. Join Room
-    socket.current.emit("join_room", roomId);
+    socket.current.emit('join_room', roomId);
 
-    // 3. Listen for Messages
-    socket.current.on("receive_message", (newMessage) => {
-      setMessages(prev => [...prev, newMessage]);
-      scrollToBottom();
+    socket.current.on('receive_message', async (newMessage) => {
+      let processedMsg = { ...newMessage };
+
+      if (processedMsg.type === 'text') {
+          // Check karo: Kya ye msg maine bheja hai?
+          const isMe = processedMsg.sender._id === currentUser._id;
+          
+          // Agar maine bheja hai -> contentForSender uthao
+          // Agar dost ne bheja hai -> contentForReceiver uthao
+          const encryptedText = isMe 
+              ? processedMsg.contentForSender 
+              : processedMsg.contentForReceiver;
+
+          // Decrypt karo apni Private Key se
+          const decryptedText = await decryptMessage(encryptedText, currentUser._id);
+          processedMsg.content = decryptedText;
+      }
+      
+      setMessages(prev => [processedMsg, ...prev]);
     });
 
-    // 4. Listen for Clear Chat
-    socket.current.on("chat_cleared", () => {
+    socket.current.on('chat_cleared', () => {
       setMessages([]);
-      Alert.alert("Notice", "Chat history was cleared.");
+      Alert.alert('Notice', 'Chat history was cleared.');
     });
 
-    // 5. Fetch History
-    fetchMessages();
+    let initialLimit = 20;
+    if (unreadCount > 20) {
+        initialLimit = unreadCount + 5;
+    }
+
+    fetchMessages(1, initialLimit);
+    markMessagesRead();
 
     return () => {
       socket.current.disconnect();
     };
   }, []);
 
-  const fetchMessages = async () => {
+  // Auto Scroll Logic
+  useEffect(() => {
+    if (!initialScrollDone && messages.length > 0 && unreadCount > 0) {
+        setTimeout(() => {
+            try {
+                const targetIndex = Math.min(unreadCount - 1, messages.length - 1);
+                if (targetIndex > 0 && flatListRef.current) {
+                    flatListRef.current.scrollToIndex({ 
+                        index: targetIndex, 
+                        animated: false, 
+                        viewPosition: 0.5 
+                    });
+                }
+            } catch (e) { console.log("Scroll Error:", e); }
+            setInitialScrollDone(true);
+        }, 500);
+    }
+  }, [messages]);
+
+  const markMessagesRead = async () => {
+      try {
+        await apiCall('PUT', apiEndpoint.chat.markRead(roomId)); 
+      } catch (error) { console.log(error); }
+  };
+
+  // FIX 2: Fetch Messages with Bulk Decryption
+  const fetchMessages = async (pageNum, limit = 20) => {
     try {
-      // You need to add this route to your backend
-      const res = await apiCall('GET', `/messages/${roomId}`); 
-      if(Array.isArray(res)) {
-          setMessages(res);
+      if (pageNum === 1) setLoadingMore(true);
+
+      const res = await apiCall('GET', `${apiEndpoint?.chat.messages(roomId)}?page=${pageNum}&limit=${limit}`);
+      
+      if (Array.isArray(res)) {
+        if (res.length < limit) setHasMore(false);
+
+        // Decrypt all text messages in this batch
+        const decryptedBatch = await Promise.all(res.map(async (m) => {
+            if (m.type === 'text') {
+                const realText = await decryptMessage(m.content, currentUser._id);
+                return { ...m, content: realText };
+            }
+            return m; // Images return as is
+        }));
+
+        if (pageNum === 1) {
+            setMessages(decryptedBatch); 
+        } else {
+            setMessages(prev => {
+                const existingIds = new Set(prev.map(m => m._id));
+                const uniqueNewMessages = decryptedBatch.filter(m => !existingIds.has(m._id));
+                return [...prev, ...uniqueNewMessages];
+            }); 
+        }
+        setPage(pageNum);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Fetch Error:', error);
     } finally {
-      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+        setLoadingMore(true);
+        fetchMessages(page + 1);
+    }
   };
 
-  // --- SEND TEXT ---
+  //  FIX 3: Sending with Encryption
   const handleSend = async () => {
     if (msg.trim().length === 0) return;
-
+    
     try {
-      const textToSend = msg;
-      setMsg(''); // Clear input immediately for UX
+        const friendPublicKey = friend.publicKey; 
+        const myPublicKey = currentUser.publicKey; // 👈 Hame apni Public Key bhi chahiye
 
-      // API Call to save DB + Emit Socket
-      await apiCall('POST', `/messages/${roomId}`, {
-         content: textToSend,
-         type: 'text'
-      });
-      // Note: We don't manually setMessages here because 
-      // the socket "receive_message" event will trigger and add it.
+        if (!friendPublicKey || !myPublicKey) {
+            Alert.alert("Error", "Public keys missing. Cannot secure chat.");
+            return;
+        }
+
+        // 🔒 1. Friend ke liye Encrypt (Taaki wo padh sake)
+        const encryptedForFriend = await encryptMessage(msg, friendPublicKey);
+
+        // 🔒 2. Khud ke liye Encrypt (Taaki hum history me padh sake)
+        const encryptedForMe = await encryptMessage(msg, myPublicKey);
+
+        if (!encryptedForFriend || !encryptedForMe) {
+            Alert.alert("Error", "Encryption failed");
+            return;
+        }
+
+        // API Call
+        await apiCall('POST', apiEndpoint.chat.messages(roomId), {
+            contentForReceiver: encryptedForFriend, // Friend wala packet
+            contentForSender: encryptedForMe,       // Mera wala packet
+            type: 'text',
+        });
+
+        setMsg('');
+        
     } catch (error) {
-      console.error("Send Error", error);
-      Alert.alert("Error", "Failed to send message");
+        console.error('Send Error', error);
     }
   };
 
-  // --- SEND IMAGE ---
   const handleImagePick = async () => {
-    const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
-    
-    if (result.assets && result.assets.length > 0) {
-       const imageUri = result.assets[0].uri;
-       // ⚠️ TODO: You need to upload this image to your server/Cloudinary 
-       // and get a URL string back. 
-       // For now, I will simulate sending the URI as content.
-       
-       // Example Upload Logic:
-       // const formData = new FormData();
-       // formData.append('image', { uri: imageUri, type: 'image/jpeg', name: 'upload.jpg' });
-       // const uploadRes = await apiCall('POST', '/upload', formData, true); // true for multipart
-       
-       await apiCall('POST', `/messages/${roomId}`, {
-           content: imageUri, // Replace with uploadRes.url
-           type: 'image'
-       });
+    try {
+      const result = await launchImageLibrary({ mediaType: 'photo', quality: 0.7 });
+      if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const formData = new FormData();
+        formData.append('chatRoomId', roomId);
+        formData.append('type', 'image');
+
+        const uri = Platform.OS === 'android' ? asset.uri : asset.uri.replace('file://', '');
+        const imageFile = {
+            uri: uri,
+            type: asset.type || 'image/jpeg', 
+            name: asset.fileName || `chat_image_${Date.now()}.jpg`, 
+        };
+        formData.append('image', imageFile);
+
+        await apiCallImageChat('POST', apiEndpoint.chat.messages(roomId), formData);
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }
+    } catch (error) {
+      console.error('Image Upload Error:', error);
+      Alert.alert('Error', 'Failed to upload image.');
     }
   };
 
   const handleClearChat = () => {
-    Alert.alert("Clear Chat", "Delete all messages for everyone?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Clear", style: 'destructive', onPress: async () => {
-            await apiCall('POST', `/chats/clear/${roomId}`);
-        }} 
+    Alert.alert('Clear Chat', 'Delete all messages?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: async () => await apiCall('POST', apiEndpoint?.chat.clear(roomId)) },
     ]);
   };
 
-  // --- RENDER ITEM ---
   const renderMessage = ({ item }) => {
-    const isMe = item.sender._id === currentUser._id || item.sender === currentUser._id;
-    
+    const senderId = item.sender?._id ? item.sender._id.toString() : item.sender.toString();
+    const myId = currentUser?._id ? currentUser._id.toString() : currentUser?.userId?.toString();
+    const isMe = senderId === myId;
+
     return (
-      <View style={[
-          styles.msgBubble, 
-          isMe ? styles.meBubble : styles.friendBubble
-      ]}>
-         {item.type === 'image' ? (
-             <Image source={{ uri: item.content }} style={styles.msgImage} />
-         ) : (
-             <Text style={isMe ? styles.meText : styles.friendText}>{item.content}</Text>
-         )}
-         <Text style={[styles.timeText, isMe ? {color:'#ddd'} : {color:'#888'}]}>
-            {new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-         </Text>
+      <View style={[styles.msgBubble, isMe ? styles.meBubble : styles.friendBubble]}>
+        {item.type === 'image' ? (
+           <Image source={{ uri: item.content }} style={styles.msgImage} resizeMode="cover" />
+        ) : (
+           <Text style={isMe ? styles.meText : styles.friendText}>{item.content}</Text>
+        )}
+        {item.createdAt && (
+            <Text style={styles.timeText}>
+                {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+        )}
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={{flex: 1, backgroundColor: '#fff'}}>
-      
-      {/* Header */}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={28} color="#333" />
         </TouchableOpacity>
-        
-        <Image 
-            source={{ uri: friend.avatar || 'https://via.placeholder.com/40' }} 
-            style={styles.avatar} 
-        />
-        <View style={{flex:1, marginLeft: 10}}>
-            <Text style={styles.name}>{friend.name}</Text>
+        <Image source={{ uri: getImageUrl(friend.avatar) }} style={styles.avatar} />
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={styles.name}>{friend.name || 'User'}</Text>
         </View>
-
         <TouchableOpacity onPress={handleClearChat}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="#333" />
+          <Ionicons name="ellipsis-horizontal" size={24} color="#333" />
         </TouchableOpacity>
       </View>
 
-      {/* Chat Area */}
-      <KeyboardAvoidingView 
-         behavior={Platform.OS === "ios" ? "padding" : undefined} 
-         style={{flex:1}} 
-         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       >
-          {loading ? (
-             <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 50}} />
-          ) : (
-             <FlatList
-                ref={flatListRef}
-                data={messages}
-                keyExtractor={item => item._id || Math.random().toString()}
-                renderItem={renderMessage}
-                contentContainerStyle={{ padding: 15 }}
-                onContentSizeChange={scrollToBottom}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Text style={{color: '#aaa'}}>Start your streak 🔥</Text>
-                    </View>
-                }
-             />
-          )}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item, index) => item._id || index.toString()} 
+          renderItem={renderMessage}
+          contentContainerStyle={{ padding: 15 }}
+          inverted={true}  
+          onEndReached={handleLoadMore} 
+          onEndReachedThreshold={0.1}
+          onScrollToIndexFailed={info => {
+            const wait = new Promise(resolve => setTimeout(resolve, 500));
+            wait.then(() => {
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+            });
+          }}
+          ListFooterComponent={ loadingMore && page > 1 ? <ActivityIndicator size="small" color="#999" /> : null }
+        />
 
-          {/* Input Bar */}
-          <View style={styles.inputContainer}>
-            <TouchableOpacity style={styles.cameraBtn} onPress={handleImagePick}>
-               <Ionicons name="camera" size={20} color="#fff" />
+        <View style={styles.inputContainer}>
+          <TouchableOpacity style={styles.cameraBtn} onPress={handleImagePick}>
+            <Ionicons name="camera" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.input}
+            placeholder="Send a chat"
+            value={msg}
+            onChangeText={setMsg}
+            placeholderTextColor="#999"
+          />
+          {msg.length > 0 ? (
+            <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
+              <Ionicons name="send" size={20} color="#fff" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
-            
-            <TextInput 
-              style={styles.input} 
-              placeholder="Send a chat" 
-              value={msg}
-              onChangeText={setMsg} 
-              placeholderTextColor="#999"
-            />
-            
-            {msg.length > 0 ? (
-               <TouchableOpacity onPress={handleSend}>
-                   <Text style={{fontWeight:'bold', color: '#007AFF', fontSize: 16}}>Send</Text>
-               </TouchableOpacity>
-            ) : (
-               <Ionicons name="mic-outline" size={24} color="#333" />
-            )}
-          </View>
+          ) : (
+            <Ionicons name="mic-outline" size={28} color="#333" />
+          )}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingTop: 40, padding: 15, borderBottomWidth: 1, borderColor: '#eee'},
+  header: {
+    flexDirection: 'row', alignItems: 'center', paddingTop: 40, padding: 15,
+    borderBottomWidth: 1, borderColor: '#eee',
+  },
   name: { fontSize: 18, fontWeight: '700' },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginLeft: 10, backgroundColor: '#eee'},
-  
-  // Message Styles
+  avatar: { width: 40, height: 40, borderRadius: 20, marginLeft: 10, backgroundColor: '#eee' },
   msgBubble: { maxWidth: '75%', padding: 12, borderRadius: 18, marginBottom: 10 },
   meBubble: { alignSelf: 'flex-end', backgroundColor: '#007AFF', borderBottomRightRadius: 2 },
   friendBubble: { alignSelf: 'flex-start', backgroundColor: '#F0F0F0', borderBottomLeftRadius: 2 },
-  
   meText: { color: '#fff', fontSize: 16 },
   friendText: { color: '#333', fontSize: 16 },
   timeText: { fontSize: 10, marginTop: 5, alignSelf: 'flex-end' },
-  
-  msgImage: { width: 200, height: 200, borderRadius: 10 },
-
-  // Input
-  inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 10, borderTopWidth: 1, borderColor: '#eee', backgroundColor: '#fff' },
+  msgImage: { width: 200, height: 200, borderRadius: 10, backgroundColor: '#ddd' },
+  inputContainer: { flexDirection: 'row', marginBottom: 15, alignItems: 'center', padding: 10, borderTopWidth: 1, borderColor: '#eee', backgroundColor: '#fff' },
   cameraBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   input: { flex: 1, backgroundColor: '#f0f0f0', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, marginRight: 10, fontSize: 16, color: '#333' },
-  
-  emptyContainer: { alignItems: 'center', marginTop: 50 }
+  sendBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', marginLeft: 5, elevation: 2 },
 });

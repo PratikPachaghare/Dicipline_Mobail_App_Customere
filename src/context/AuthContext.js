@@ -2,9 +2,6 @@ import React, { createContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { verifyToken } from '../utils/apiCalls';
 
-// Replace with your actual backend URL (Use your IP if testing on device, e.g., http://192.168.1.5:8000)
-const API_URL = 'http://10.0.2.2:8000/api'; 
-
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
@@ -53,7 +50,7 @@ useEffect(() => {
     loadAuthData();
   }, []);
 
-  // ✅ Login
+  //  Login
   const login = async ({ token, user }) => {
     setToken(token);
     setUser(user);
@@ -61,12 +58,13 @@ useEffect(() => {
     await AsyncStorage.setItem('user', JSON.stringify(user));
   };
 
-  // 🚪 Logout
-  const logout = async () => {
+  //  Logout
+  const logout = async ({userId}) => {
     setToken(null);
     setUser(null);
-    await AsyncStorage.removeItem('token');s
+    await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem(`PRIVATE_KEY_${userId}`);
   };
 
   return (

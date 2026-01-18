@@ -3,7 +3,8 @@
 export default apiEndpoint = {
     auth :{
         login:"/auth/login",
-        register:"/auth/register"
+        register:"/auth/register",
+        updateKeys:"/auth/update-keys"
     },
     task :{
         createList:"/task/tasks/createList",
@@ -32,10 +33,15 @@ export default apiEndpoint = {
         leaderboard_profile:(userId) => `/leaderboard/leaderboard-profile/${userId}`
     },
     chat: {
-        list: '/chat/list',           // GET: Active chats
-        pending: '/chat/pending',     // GET: Pending requests
-        suggestions: '/chat/suggestions', // GET: Users to invite
-        invite: '/chat/invite',       // POST: Send invite
-        accept: '/chat/accept',       // POST: Accept invite
-  }
+        list: '/chat/list',              // GET
+        pending: '/chat/pending',        // GET
+        suggestions: '/chat/suggestions',// GET
+        invite: '/chat/invite',          // POST
+        accept: '/chat/accept',          // POST
+        
+        // We use functions here to handle the dynamic ID
+        messages: (roomId) => `/chat/messages/${roomId}`,
+        markRead: (roomId) => `/chat/message/read/${roomId}`,
+        clear: (roomId) => `/chat/clear/${roomId}`,
+    }
 }
